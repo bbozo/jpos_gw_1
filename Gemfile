@@ -39,4 +39,3 @@ gem 'jquery-rails'
 # gem 'debugger'
 
 gem 'pry'
-gem 'pry-rails'

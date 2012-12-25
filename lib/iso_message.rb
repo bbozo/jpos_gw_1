@@ -1,5 +1,7 @@
 class IsoMessage
 
+  require 'pry'
+
   ISO_MESSAGE_FORMATS_PATH = "#{::Rails.root}/config/iso_message_formats"
 
   java_import Java::java::io::IOException;
@@ -9,29 +11,48 @@ class IsoMessage
 
   attr_accessor :message_format
   attr_accessor :msg
+  attr_accessor :raw_msg
+  attr_accessor :iso_msg
   
   def initialize(options = {})
-    self.msg = options[:msg] || {}
-    self.message_format = options[:message_format] || :basic
+    self.raw_msg = options[:raw_msg]    if options[:raw_msg]
+    self.iso_msg = options[:iso_msg]    if options[:iso_msg]
+    self.msg     = options[:msg] || {}  if options[:msg]
+    
+    self
   end
-
-  def iso_msg(format = message_format)
-    packager = new_packager_for format
+  
+  # expects raw java byte array arg
+  def raw_msg=(arg)
+    tmp = iso_msg_factory
+    tmp.unpack arg
     
-    iso_msg = ISOMsg.new
-    iso_msg.packager = packager
+    self.iso_msg = tmp
     
-    iso_msg.mti = self.msg[:mti].to_s
+    arg
+  end
+  
+  # expect ISOMsg arg
+  def iso_msg=(arg)
+    puts arg.class.to_s
+    self.msg = {}
+    self.msg[:mti]    = arg.mti
+    self.msg[:header] = arg.header if arg.header
     
-    self.msg.clone.reject{|k,v| not k.is_a? Fixnum}.each do |k,v|
-      iso_msg.set k, v
+    (1..arg.max_field).each do |field|
+      self.msg[field] = arg.value(field) if arg.has_field? field
     end
     
-    iso_msg
+    arg
   end
   
   def raw_msg
-    Raw.new iso_msg.pack
+    return nil unless ready_to_build_iso_msg?
+    Raw.new iso_msg_factory.pack
+  end
+  
+  def iso_msg
+    iso_msg_factory
   end
   
   # just an example factory method
@@ -60,17 +81,49 @@ class IsoMessage
     def to_s
       String.from_java_bytes self.raw
     end
+    
+    alias_method :to_raw, :raw
   
   end
   
-  private
+  #private
   
-  def iso_message_format_path format = message_format
-    "#{ISO_MESSAGE_FORMATS_PATH}/#{format}.xml"
+  def message_format
+    :basic
   end
   
-  def new_packager_for format = message_format
-    GenericPackager.new iso_message_format_path(format)
+  def ready_to_build_iso_msg?
+    @msg and not @msg.empty?
+  end
+  
+  # factory method for generating ISOMsg instances w implemented housekeeping
+  def iso_msg_factory(options = {})
+    populate_from_msg = options[:populate_from_msg] ||= true
+   
+    rv = ISOMsg.new
+    rv.packager = new_packager_for(message_format)
+    
+    populate_iso_msg! rv if populate_from_msg
+    
+    rv
+  end
+  
+  def iso_message_format_path message_format
+    "#{ISO_MESSAGE_FORMATS_PATH}/#{message_format}.xml"
+  end
+  
+  def new_packager_for message_format
+    GenericPackager.new iso_message_format_path(message_format)
+  end
+  
+  def populate_iso_msg! rv_iso_msg, msg = self.msg
+    if ready_to_build_iso_msg?
+      rv_iso_msg.mti = self.msg[:mti].to_s
+      
+      self.msg.clone.reject{|k,v| not k.is_a? Fixnum}.each do |k,v|
+        rv_iso_msg.set k, v
+      end
+    end  
   end
 
 end

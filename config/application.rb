@@ -61,5 +61,5 @@ module JposGw1
   end
 end
 
-require 'java'
+#require 'java'
 Dir["#{::Rails.root}/lib/java_dependencies/*.jar"].each { |jar| puts "Autoloading #{jar}"; require jar }
