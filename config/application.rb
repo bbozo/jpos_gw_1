@@ -60,3 +60,5 @@ module JposGw1
     config.assets.version = '1.0'
   end
 end
+
+$CLASSPATH << 'lib'
