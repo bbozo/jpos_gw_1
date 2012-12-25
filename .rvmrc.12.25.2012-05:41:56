@@ -1,0 +1,2 @@
+#!/bin/sh
+rvm --rvmrc --create jruby
